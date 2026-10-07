@@ -1,0 +1,175 @@
+<!doctype html>
+<html>
+<head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:; base-uri 'none'; form-action 'none'">
+<meta charset="utf-8">
+<title>SplitStream</title>
+<style>
+*{box-sizing:border-box;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;}
+body{margin:0;background:#0f172a;color:#e2e8f0;width:1280px;height:720px;overflow:hidden;}
+.app{display:flex;flex-direction:column;height:100%;}
+header{padding:16px 24px;background:#111827;border-bottom:1px solid #1f2937;}
+header h1{margin:0;font-size:22px;color:#38bdf8;}
+header p{margin:2px 0 0;font-size:13px;color:#94a3b8;}
+main{flex:1;display:flex;gap:20px;padding:20px 24px;}
+.list{width:380px;display:flex;flex-direction:column;gap:12px;}
+.card{background:#1e293b;border:2px solid #334155;border-radius:10px;padding:14px;cursor:pointer;}
+.card.selected{border-color:#38bdf8;background:#1e3a52;}
+.card h3{margin:0 0 4px;font-size:16px;}
+.card p{margin:0;font-size:12px;color:#94a3b8;}
+.btn{background:#38bdf8;color:#0f172a;border:none;padding:10px 14px;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;}
+.btn.secondary{background:#334155;color:#e2e8f0;}
+.btn:hover{opacity:0.9;}
+.detail{flex:1;background:#1e293b;border-radius:12px;padding:24px;border:1px solid #334155;}
+.detail h2{margin-top:0;color:#38bdf8;}
+.detail p{font-size:14px;margin:8px 0;}
+.detail .big{font-size:32px;font-weight:700;color:#4ade80;}
+.actions{display:flex;gap:10px;margin-top:20px;}
+.hidden{display:none !important;}
+.msg{margin-top:14px;font-size:13px;color:#4ade80;}
+.overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,0.85);display:flex;align-items:center;justify-content:center;}
+.panel{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:24px;width:360px;}
+.panel h3{margin-top:0;color:#38bdf8;}
+.panel label{display:block;font-size:12px;margin:10px 0 4px;color:#94a3b8;}
+.panel input{width:100%;padding:8px;border-radius:6px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;}
+.panel .row{display:flex;gap:10px;margin-top:16px;}
+footer{padding:8px 24px;font-size:11px;color:#64748b;background:#111827;}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+<h1>SplitStream</h1>
+<p>Real-time salary & subscription streaming in stablecoins on Solana</p>
+</header>
+<main>
+<section class="list">
+<div class="card selected" data-demo="stream-card-1" onclick="selectStream('alice')">
+<h3>Alice Kim — Contributor</h3>
+<p>Rate: 0.0025 USDC/sec · Status: Active</p>
+</div>
+<div class="card" data-demo="stream-card-2" onclick="selectStream('bob')">
+<h3>Bob Chen — Contributor</h3>
+<p>Rate: 0.0018 USDC/sec · Status: Active</p>
+</div>
+<button class="btn" data-demo="create-stream-btn" onclick="togglePanel(true)">+ New Stream</button>
+<button class="btn secondary" data-demo="batch-btn" onclick="runBatch()">Run Batch Payroll</button>
+<div class="msg hidden" data-demo="batch-msg">Batch payroll sent to 12 contributors ✅</div>
+</section>
+
+<section class="detail" data-demo="detail-panel">
+<h2 data-demo="detail-name">Alice Kim</h2>
+<p>Rate: <span data-demo="detail-rate">0.0025 USDC/sec</span></p>
+<p>Status: <span data-demo="detail-status">Active</span></p>
+<p>Funded Amount: <span data-demo="detail-funded">1000.00 USDC</span></p>
+<p>Accrued Balance:</p>
+<div class="big"><span data-demo="balance-counter">128.40</span> USDC</div>
+<div class="actions">
+<button class="btn" data-demo="pause-btn" onclick="togglePause()">Pause Stream</button>
+<button class="btn secondary" data-demo="topup-btn" onclick="topUp()">Top Up +500</button>
+<button class="btn secondary" data-demo="withdraw-btn" onclick="withdraw()">Withdraw</button>
+</div>
+<p class="msg hidden" data-demo="action-msg"></p>
+</section>
+</main>
+
+<div class="overlay hidden" data-demo="create-panel">
+<div class="panel">
+<h3>Create New Stream</h3>
+<label>Recipient Wallet</label>
+<input data-demo="input-recipient" type="text" placeholder="7xKX...9pQ2">
+<label>Rate (USDC/sec)</label>
+<input data-demo="input-rate" type="text" placeholder="0.0020">
+<div class="row">
+<button class="btn" data-demo="launch-btn" onclick="launchStream()">Launch Stream</button>
+<button class="btn secondary" data-demo="close-panel-btn" onclick="togglePanel(false)">Cancel</button>
+</div>
+</div>
+</div>
+
+<footer>Prototype — all data is simulated</footer>
+</div>
+
+<script>
+var streams = {
+  alice: {name:"Alice Kim", rate:"0.0025 USDC/sec", status:"Active", funded:1000.00, balance:128.40},
+  bob: {name:"Bob Chen", rate:"0.0018 USDC/sec", status:"Active", funded:800.00, balance:94.10}
+};
+var current = "alice";
+
+function render(){
+  var s = streams[current];
+  document.querySelector('[data-demo="detail-name"]').textContent = s.name;
+  document.querySelector('[data-demo="detail-rate"]').textContent = s.rate;
+  document.querySelector('[data-demo="detail-status"]').textContent = s.status;
+  document.querySelector('[data-demo="detail-funded"]').textContent = s.funded.toFixed(2) + " USDC";
+  document.querySelector('[data-demo="balance-counter"]').textContent = s.balance.toFixed(2);
+  var pauseBtn = document.querySelector('[data-demo="pause-btn"]');
+  pauseBtn.textContent = s.status === "Active" ? "Pause Stream" : "Resume Stream";
+}
+
+function selectStream(id){
+  current = id;
+  document.querySelector('[data-demo="stream-card-1"]').classList.toggle('selected', id==='alice');
+  document.querySelector('[data-demo="stream-card-2"]').classList.toggle('selected', id==='bob');
+  hideMsg();
+  render();
+}
+
+function togglePause(){
+  var s = streams[current];
+  s.status = s.status === "Active" ? "Paused" : "Active";
+  showMsg(s.status === "Paused" ? "Stream paused by payer." : "Stream resumed.");
+  render();
+}
+
+function topUp(){
+  var s = streams[current];
+  s.funded += 500;
+  showMsg("Added 500 USDC to stream funding.");
+  render();
+}
+
+function withdraw(){
+  var s = streams[current];
+  var amt = s.balance.toFixed(2);
+  s.balance = 0;
+  showMsg("Withdrew " + amt + " USDC to your wallet.");
+  render();
+}
+
+function runBatch(){
+  var m = document.querySelector('[data-demo="batch-msg"]');
+  m.classList.remove('hidden');
+}
+
+function togglePanel(show){
+  document.querySelector('[data-demo="create-panel"]').classList.toggle('hidden', !show);
+}
+
+function launchStream(){
+  togglePanel(false);
+  showMsg("New stream created and funded!");
+}
+
+function showMsg(text){
+  var m = document.querySelector('[data-demo="action-msg"]');
+  m.textContent = text;
+  m.classList.remove('hidden');
+}
+function hideMsg(){
+  document.querySelector('[data-demo="action-msg"]').classList.add('hidden');
+}
+
+setInterval(function(){
+  for(var k in streams){
+    if(streams[k].status === "Active"){
+      streams[k].balance += 0.02;
+    }
+  }
+  render();
+}, 1000);
+
+render();
+</script>
+</body>
+</html>
